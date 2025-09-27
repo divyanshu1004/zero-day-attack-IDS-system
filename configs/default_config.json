@@ -1,0 +1,101 @@
+{
+  "system": {
+    "log_level": "INFO",
+    "log_file": "logs/ids.log",
+    "data_dir": "datasets",
+    "models_dir": "models",
+    "results_dir": "results"
+  },
+  "network": {
+    "interface": null,
+    "capture_filter": null,
+    "max_packet_rate": 10000,
+    "flow_timeout": 300
+  },
+  "detection": {
+    "alert_threshold": 0.5,
+    "model_update_interval": 3600,
+    "retrain_threshold": 100,
+    "websocket_port": 8765
+  },
+  "models": {
+    "ensemble_config": {
+      "isolation_forest": {
+        "contamination": 0.1,
+        "n_estimators": 100,
+        "random_state": 42
+      },
+      "one_class_svm": {
+        "nu": 0.1,
+        "kernel": "rbf",
+        "gamma": "scale"
+      },
+      "autoencoder": {
+        "encoding_dim": 32,
+        "epochs": 100,
+        "batch_size": 256
+      },
+      "lstm": {
+        "sequence_length": 10,
+        "lstm_units": 50,
+        "epochs": 50
+      },
+      "pytorch_ae": {
+        "encoding_dim": 32,
+        "epochs": 100,
+        "learning_rate": 0.001
+      }
+    }
+  },
+  "datasets": {
+    "nsl_kdd": {
+      "enabled": true,
+      "preprocessing": {
+        "normalize": true,
+        "handle_categorical": true,
+        "feature_selection": false
+      }
+    },
+    "cicids2017": {
+      "enabled": false,
+      "preprocessing": {
+        "normalize": true,
+        "handle_categorical": true,
+        "feature_selection": true
+      }
+    }
+  },
+  "simulation": {
+    "default_target": "192.168.1.100",
+    "default_duration": 60,
+    "attack_intensities": {
+      "low": {
+        "packet_rate": 100,
+        "connection_rate": 10
+      },
+      "medium": {
+        "packet_rate": 1000,
+        "connection_rate": 100
+      },
+      "high": {
+        "packet_rate": 10000,
+        "connection_rate": 1000
+      }
+    }
+  },
+  "alerts": {
+    "email_notifications": false,
+    "webhook_url": null,
+    "severity_levels": {
+      "low": 0.3,
+      "medium": 0.6,
+      "high": 0.8,
+      "critical": 0.9
+    }
+  },
+  "performance": {
+    "max_memory_usage": "2GB",
+    "cpu_threshold": 80,
+    "disk_threshold": 90
+  }
+}

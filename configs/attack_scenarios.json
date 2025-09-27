@@ -1,0 +1,144 @@
+{
+  "scenarios": [
+    {
+      "name": "DoS Attack Simulation",
+      "type": "dos",
+      "description": "Simulate a Denial of Service attack using TCP SYN flood",
+      "target_ip": "192.168.1.100",
+      "target_port": 80,
+      "duration": 60,
+      "intensity": "medium",
+      "parameters": {
+        "packet_size": 512,
+        "attack_vector": "syn_flood"
+      }
+    },
+    {
+      "name": "DDoS Attack Simulation",
+      "type": "ddos",
+      "description": "Simulate a Distributed Denial of Service attack",
+      "target_ip": "192.168.1.100",
+      "target_port": 80,
+      "duration": 120,
+      "intensity": "high",
+      "parameters": {
+        "source_count": 100,
+        "attack_vector": "distributed_syn_flood"
+      }
+    },
+    {
+      "name": "Port Scan Simulation",
+      "type": "port_scan",
+      "description": "Simulate network port scanning activity",
+      "target_ip": "192.168.1.100",
+      "duration": 30,
+      "intensity": "medium",
+      "parameters": {
+        "scan_type": "tcp_syn",
+        "port_range": 1000
+      }
+    },
+    {
+      "name": "Brute Force Attack",
+      "type": "brute_force",
+      "description": "Simulate brute force login attempts",
+      "target_ip": "192.168.1.100",
+      "target_port": 22,
+      "duration": 180,
+      "intensity": "low",
+      "parameters": {
+        "service": "ssh",
+        "credential_list": "common_passwords.txt"
+      }
+    },
+    {
+      "name": "Zero-Day Attack Simulation",
+      "type": "zero_day",
+      "description": "Simulate novel attack patterns to test zero-day detection",
+      "target_ip": "192.168.1.100",
+      "duration": 300,
+      "intensity": "medium",
+      "parameters": {
+        "mutation_rate": 0.3,
+        "evasion_techniques": [
+          "timing_variation",
+          "payload_obfuscation",
+          "protocol_anomaly"
+        ]
+      }
+    },
+    {
+      "name": "Steganographic Communication",
+      "type": "zero_day",
+      "description": "Simulate covert channel communication",
+      "target_ip": "192.168.1.100",
+      "duration": 600,
+      "intensity": "low",
+      "parameters": {
+        "covert_channel_type": "timing_based",
+        "data_payload": "secret_communication_test"
+      }
+    },
+    {
+      "name": "Advanced Persistent Threat (APT)",
+      "type": "zero_day",
+      "description": "Simulate low-and-slow advanced persistent threat",
+      "target_ip": "192.168.1.100",
+      "duration": 3600,
+      "intensity": "low",
+      "parameters": {
+        "stealth_mode": true,
+        "beacon_interval": 300,
+        "data_exfiltration": true
+      }
+    },
+    {
+      "name": "IoT Botnet Simulation",
+      "type": "ddos",
+      "description": "Simulate IoT device botnet attack",
+      "target_ip": "192.168.1.100",
+      "target_port": 443,
+      "duration": 240,
+      "intensity": "high",
+      "parameters": {
+        "device_types": ["camera", "router", "smart_tv"],
+        "geographic_distribution": true,
+        "attack_pattern": "pulsed"
+      }
+    }
+  ],
+  "attack_profiles": {
+    "script_kiddie": {
+      "sophistication": "low",
+      "tools": ["hping3", "nmap", "hydra"],
+      "patterns": ["noisy", "obvious", "signature_based"]
+    },
+    "advanced_hacker": {
+      "sophistication": "high",
+      "tools": ["custom_scripts", "zero_day_exploits"],
+      "patterns": ["stealthy", "polymorphic", "targeted"]
+    },
+    "nation_state": {
+      "sophistication": "very_high",
+      "tools": ["advanced_malware", "supply_chain_attacks"],
+      "patterns": ["persistent", "multi_vector", "attribution_resistant"]
+    }
+  },
+  "target_environments": {
+    "corporate_network": {
+      "ip_range": "192.168.1.0/24",
+      "services": [80, 443, 22, 21, 25, 53, 3389],
+      "security_level": "medium"
+    },
+    "critical_infrastructure": {
+      "ip_range": "10.0.0.0/8",
+      "services": [502, 2404, 44818, 102],
+      "security_level": "high"
+    },
+    "home_network": {
+      "ip_range": "192.168.0.0/24",
+      "services": [80, 443, 22, 8080, 554],
+      "security_level": "low"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+2025-09-27 14:20:08,210 - src.data.dataset_manager - INFO - Created sample NSL-KDD data
+2025-09-27 14:20:08,313 - src.models.ensemble_detector - INFO - Initialized 0 models: []
+2025-09-27 14:20:08,317 - src.models.ensemble_detector - INFO - Ensemble training completed
+2025-09-27 14:20:08,327 - src.models.ensemble_detector - INFO - Models saved to models
+2025-09-27 14:32:29,833 - src.models.ensemble_detector - INFO - Initialized 0 models: []
+2025-09-27 14:32:29,852 - src.models.ensemble_detector - INFO - Ensemble training completed
+2025-09-27 14:32:29,862 - src.models.ensemble_detector - INFO - Models saved to models
+2025-09-27 14:33:08,296 - src.models.ensemble_detector - INFO - Initialized 0 models: []
+2025-09-27 14:33:08,301 - src.models.ensemble_detector - INFO - Ensemble training completed
+2025-09-27 14:33:08,310 - src.models.ensemble_detector - INFO - Models saved to models
