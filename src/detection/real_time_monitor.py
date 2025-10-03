@@ -13,6 +13,10 @@ import numpy as np
 from collections import defaultdict, deque
 import asyncio
 import websockets
+import os
+import http.server
+import socketserver
+from pathlib import Path
 
 from ..analysis.traffic_analyzer import TrafficAnalyzer, FlowFeatures
 from ..models.ensemble_detector import EnsembleDetector
@@ -172,11 +176,25 @@ class RealTimeMonitor:
         self.packet_processor_thread = None
         self.model_analyzer_thread = None
         self.websocket_server = None
+        self.websocket_thread = None
+        self.websocket_loop = None
+        self._websocket_stop_event = threading.Event()
+        
+        # HTTP dashboard server
+        self.http_server = None
+        self.http_thread = None
+        self._http_stop_event = threading.Event()
+        
+        # WebSocket clients tracking
+        self.websocket_clients = set()
         
         # Adaptive learning
         self.feedback_buffer = deque(maxlen=1000)
         self.retrain_threshold = 100
         self.last_retrain_time = time.time()
+        
+        # Setup alert callback for real-time WebSocket broadcasting
+        self.alert_manager.add_alert_callback(self.broadcast_alert_to_websockets)
         
         # Initialize model
         self.initialize_model()
@@ -342,11 +360,13 @@ class RealTimeMonitor:
                     max_score = max(model_scores.values()) if model_scores else 0
                     
                     # Create alert
+                    source_ip = packet['packet_features'].get('src_ip', 'unknown')
                     alert_data = {
                         'type': 'ml_anomaly',
                         'severity': 'high' if max_score > 0.8 else 'medium',
                         'severity_score': max_score,
-                        'description': f"ML models detected anomaly from {packet['packet_features'].get('src_ip', 'unknown')}",
+                        'source_ip': source_ip,
+                        'description': f"ML models detected anomaly from {source_ip}",
                         'model_scores': model_scores,
                         'packet_info': packet['packet_features']
                     }
@@ -388,6 +408,9 @@ class RealTimeMonitor:
             # Start WebSocket server for real-time updates
             self.start_websocket_server()
             
+            # Start HTTP server for dashboard
+            self.start_http_server()
+            
             self.logger.info("Real-time monitoring started successfully")
             return True
             
@@ -413,50 +436,194 @@ class RealTimeMonitor:
             self.model_analyzer_thread.join(timeout=5)
         
         # Stop WebSocket server
-        if self.websocket_server:
-            self.websocket_server.close()
+        if self.websocket_loop:
+            self._websocket_stop_event.set()
+            try:
+                self.websocket_loop.call_soon_threadsafe(lambda: None)
+            except Exception:
+                pass
+        if self.websocket_thread and self.websocket_thread.is_alive():
+            self.websocket_thread.join(timeout=5)
+        
+        # Stop HTTP server
+        if self.http_server:
+            self._http_stop_event.set()
+            try:
+                self.http_server.shutdown()
+            except Exception:
+                pass
+        if self.http_thread and self.http_thread.is_alive():
+            self.http_thread.join(timeout=5)
         
         self.logger.info("Real-time monitoring stopped")
     
     def start_websocket_server(self):
         """Start WebSocket server for real-time dashboard"""
-        async def handle_client(websocket, path):
+        if self.websocket_thread and self.websocket_thread.is_alive():
+            self.logger.debug("WebSocket server already running")
+            return
+
+        async def handle_client(websocket):  # Remove path parameter for websockets 11.x
             try:
+                # Add client to tracking set
+                self.websocket_clients.add(websocket)
+                
+                # Send initial connection message
                 await websocket.send(json.dumps({
                     'type': 'connection',
                     'message': 'Connected to IDS monitoring'
                 }))
                 
-                # Send periodic updates
-                while self.is_monitoring:
-                    stats = self.get_monitoring_stats()
-                    await websocket.send(json.dumps({
-                        'type': 'stats_update',
-                        'data': stats
-                    }))
-                    
-                    await asyncio.sleep(5)  # Update every 5 seconds
-                    
+                # Send initial system status
+                await websocket.send(json.dumps({
+                    'type': 'system_status',
+                    'models': {
+                        'isolationForest': self.model_ready,
+                        'oneClassSVM': self.model_ready,
+                        'autoencoder': self.model_ready,
+                        'lstmNetwork': self.model_ready
+                    }
+                }))
+                
+                while self.is_monitoring and not self._websocket_stop_event.is_set():
+                    try:
+                        # Send stats update (change type to 'stats')
+                        stats = self.get_monitoring_stats()
+                        await websocket.send(json.dumps({
+                            'type': 'stats',
+                            'total_packets': stats.get('performance', {}).get('total_packets', 0),
+                            'active_connections': len(self.traffic_analyzer.flow_tracker) if hasattr(self.traffic_analyzer, 'flow_tracker') else 0,
+                            'suspicious_ips': []  # Will be populated from alerts
+                        }))
+                        
+                        await asyncio.sleep(5)
+                        
+                    except Exception as e:
+                        self.logger.error(f"Error sending WebSocket data: {e}")
+                        break
+                        
             except websockets.exceptions.ConnectionClosed:
-                pass
+                self.logger.info("WebSocket client disconnected")
             except Exception as e:
-                self.logger.error(f"WebSocket error: {e}")
-        
-        # Start server in a separate thread
-        def run_server():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            
+                self.logger.error(f"WebSocket client error: {e}")
+            finally:
+                # Remove client from tracking set
+                self.websocket_clients.discard(websocket)
+
+        async def server_main():
             port = self.config.get('websocket_port', 8765)
-            self.websocket_server = websockets.serve(
-                handle_client, "localhost", port
-            )
+            try:
+                async with websockets.serve(handle_client, "localhost", port) as server:
+                    self.websocket_server = server
+                    self.logger.info(f"WebSocket server listening on ws://localhost:{port}")
+                    while not self._websocket_stop_event.is_set() and self.is_monitoring:
+                        await asyncio.sleep(0.5)
+            except Exception as e:
+                self.logger.error(f"Failed to start WebSocket server: {e}")
+
+        def run_server():
+            self.websocket_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.websocket_loop)
+            try:
+                self.websocket_loop.run_until_complete(server_main())
+            finally:
+                # Cancel remaining tasks
+                pending = asyncio.all_tasks(self.websocket_loop)
+                for task in pending:
+                    task.cancel()
+                try:
+                    self.websocket_loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                except Exception:
+                    pass
+                self.websocket_loop.close()
+                self.logger.info("WebSocket loop closed")
+
+        self._websocket_stop_event.clear()
+        self.websocket_thread = threading.Thread(target=run_server, daemon=True)
+        self.websocket_thread.start()
+
+    def start_http_server(self):
+        """Start HTTP server for dashboard"""
+        if self.http_thread and self.http_thread.is_alive():
+            self.logger.debug("HTTP server already running")
+            return
             
-            loop.run_until_complete(self.websocket_server)
-            loop.run_forever()
+        class DashboardHandler(http.server.SimpleHTTPRequestHandler):
+            def __init__(self, *args, **kwargs):
+                # Set the directory to serve from
+                dashboard_dir = Path(__file__).parent.parent.parent / "dashboard"
+                self.logger = logging.getLogger(__name__)
+                self.logger.info(f"Dashboard directory: {dashboard_dir}")
+                super().__init__(*args, directory=str(dashboard_dir), **kwargs)
+            
+            def log_message(self, format, *args):
+                # Suppress default HTTP logging to avoid spam
+                pass
         
-        websocket_thread = threading.Thread(target=run_server, daemon=True)
-        websocket_thread.start()
+        def run_http_server():
+            try:
+                port = self.config.get('http_port', 8000)
+                self.logger.info(f"Starting HTTP server on port {port}...")
+                
+                with socketserver.ThreadingTCPServer(("", port), DashboardHandler) as httpd:
+                    self.http_server = httpd
+                    self.logger.info(f"HTTP dashboard server listening on port {port}")
+                    self.logger.info(f"Dashboard available at: http://localhost:{port}")
+                    
+                    # Serve requests until stop event is set
+                    httpd.timeout = 1  # Set timeout so we can check stop event
+                    while not self._http_stop_event.is_set() and self.is_monitoring:
+                        httpd.handle_request()
+                        
+            except Exception as e:
+                self.logger.error(f"Failed to start HTTP server: {e}")
+                import traceback
+                self.logger.error(f"HTTP server traceback: {traceback.format_exc()}")
+        
+        self._http_stop_event.clear()
+        self.http_thread = threading.Thread(target=run_http_server, daemon=True, name="HTTPServer")
+        self.http_thread.start()
+
+    def broadcast_alert_to_websockets(self, alert: Dict[str, Any]):
+        """Broadcast alert to all connected WebSocket clients"""
+        if not self.websocket_clients:
+            return
+            
+        # Format alert for dashboard
+        alert_message = {
+            'type': 'alert',
+            'timestamp': alert.get('timestamp'),
+            'attack_type': alert.get('type', 'ML Anomaly'),
+            'source_ip': alert.get('source_ip', 'Unknown'),
+            'severity': alert.get('severity', 'medium'),
+            'description': alert.get('description', 'Anomalous activity detected')
+        }
+        
+        # Send to all connected clients (in a thread-safe way)
+        if self.websocket_loop and not self.websocket_loop.is_closed():
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    self._send_to_all_clients(alert_message), 
+                    self.websocket_loop
+                )
+            except Exception as e:
+                self.logger.error(f"Error broadcasting alert: {e}")
+    
+    async def _send_to_all_clients(self, message: Dict[str, Any]):
+        """Send message to all connected WebSocket clients"""
+        if not self.websocket_clients:
+            return
+            
+        # Create a copy of clients to avoid modification during iteration
+        clients = self.websocket_clients.copy()
+        message_json = json.dumps(message)
+        
+        for client in clients:
+            try:
+                await client.send(message_json)
+            except Exception as e:
+                # Remove disconnected clients
+                self.websocket_clients.discard(client)
     
     def add_feedback(self, packet_id: str, is_malicious: bool, confidence: float = 1.0):
         """Add human feedback for adaptive learning"""
