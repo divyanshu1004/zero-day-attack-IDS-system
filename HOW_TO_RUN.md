@@ -66,20 +66,40 @@ cd "g:\projects1\fullStack\zero-day-attack"
 ✅ Model training completed successfully!
 ```
 
-### **2. 🔍 Start Real-Time Monitoring**
+### **2. 🔍 Start Real-Time Monitoring with Dashboard**
 
 ```powershell
-# Basic monitoring (uses sample data if no network access)
+# Start monitoring with integrated web dashboard (RECOMMENDED)
 .venv\Scripts\python.exe main.py monitor
 
-# Monitor specific network interface (requires admin privileges)
-.venv\Scripts\python.exe main.py monitor --interface eth0
-
-# Monitor with custom settings
-.venv\Scripts\python.exe main.py monitor --config configs/monitor_config.yaml
+# The system will start both:
+# - HTTP Dashboard Server on port 8000
+# - WebSocket Server on port 8765
+# - Real-time ML anomaly detection
 ```
 
-**What happens:** System starts detecting attacks in real-time and displays alerts.
+**What happens:**
+
+- ✅ System initializes 5 ML models (Isolation Forest, One-Class SVM, Autoencoder, LSTM, PyTorch AE)
+- ✅ Starts HTTP server for dashboard on port 8000
+- ✅ Starts WebSocket server for real-time updates on port 8765
+- ✅ Begins real-time network traffic analysis and threat detection
+- ✅ Live alerts are broadcasted to connected dashboard clients
+
+**📊 Dashboard Access:**
+
+- **🌐 Web Dashboard:** http://localhost:8000 (Primary interface - **START HERE**)
+- **🔌 WebSocket Endpoint:** ws://localhost:8765 (Auto-connected by dashboard)
+- **📝 Logs:** Available at `logs/monitoring.log`
+
+**💡 Pro Tips:**
+
+- ✅ Dashboard shows **🟢 Connected to IDS** when WebSocket is working
+- ✅ Real-time alerts appear automatically in the alerts table
+- ✅ Statistics update live (packets analyzed, threats detected, etc.)
+- ✅ Dark theme optimized for security operations centers
+
+⚠️ **Setup Time:** Allow 30-60 seconds for complete system initialization before accessing dashboard.
 
 ### **3. 💥 Simulate Attack Scenarios**
 
@@ -273,6 +293,46 @@ print(f'Memory: {psutil.virtual_memory().percent}%')
 ✅ Solution: Install scapy with: .venv\Scripts\pip install scapy
 ```
 
+#### **5. Dashboard Connection Issues**
+
+```
+❌ Dashboard shows "🔴 Disconnected" status
+✅ Solutions:
+   1. Ensure monitoring is running: .venv\Scripts\python.exe main.py monitor
+   2. Wait 30-60 seconds for full system initialization
+   3. Look for these messages in terminal:
+      - "HTTP dashboard server listening on port 8000"
+      - "WebSocket server started on ws://localhost:8765"
+   4. Refresh browser at http://localhost:8000
+   5. Check firewall/antivirus blocking ports 8000/8765
+```
+
+#### **6. WebSocket Connection Troubleshooting**
+
+```
+❌ "Connection lost. Attempting to reconnect..." message
+✅ Solutions:
+   1. ✅ ALWAYS use http://localhost:8000 (not ws://localhost:8765 directly)
+   2. ✅ Dashboard auto-connects to WebSocket - no manual connection needed
+   3. ✅ If connection issues persist:
+      - Stop monitoring (Ctrl+C)
+      - Restart: .venv\Scripts\python.exe main.py monitor
+      - Wait for "WebSocket server started" message
+      - Refresh dashboard browser tab
+```
+
+#### **7. Port Already in Use**
+
+```
+❌ "Address already in use" error
+✅ Solutions:
+   # Check what's using the ports
+   netstat -an | findstr "8000 8765"
+
+   # Kill existing processes if needed
+   # Find PID and use: Stop-Process -Id <PID> -Force
+```
+
 ### **Debug Mode:**
 
 ```powershell
@@ -308,9 +368,9 @@ print(f'Memory: {psutil.virtual_memory().percent}%')
 .venv\Scripts\python.exe main.py train
 
 # 2. Start monitoring
-.venv\Scripts\python.exe main.py monitor --dashboard
+.venv\Scripts\python.exe main.py monitor
 
-# 3. Access dashboard at http://localhost:8765
+# 3. Access dashboard at http://localhost:8000
 # 4. Configure alerts in configs/default_config.json
 ```
 

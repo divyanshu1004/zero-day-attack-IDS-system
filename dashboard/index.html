@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zero-Day Attack Detection IDS Dashboard</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #1a1a2e, #16213e);
+        color: #ffffff;
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+        padding: 20px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 15px;
+        backdrop-filter: blur(10px);
+      }
+
+      .header h1 {
+        color: #00d4ff;
+        font-size: 2.5em;
+        margin-bottom: 10px;
+        text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+      }
+
+      .status {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 15px;
+      }
+
+      .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #ff4444;
+        animation: pulse 1.5s infinite;
+      }
+
+      .status-indicator.connected {
+        background: #44ff44;
+      }
+
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        50% {
+          transform: scale(1.2);
+          opacity: 0.7;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+
+      .dashboard {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+
+      .card {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 15px;
+        padding: 25px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: transform 0.3s ease;
+      }
+
+      .card:hover {
+        transform: translateY(-5px);
+      }
+
+      .card h3 {
+        color: #00d4ff;
+        margin-bottom: 15px;
+        font-size: 1.3em;
+        text-align: center;
+      }
+
+      .stat {
+        display: flex;
+        justify-content: space-between;
+        margin: 10px 0;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .stat:last-child {
+        border-bottom: none;
+      }
+
+      .stat-value {
+        font-weight: bold;
+        color: #00ff88;
+      }
+
+      .alerts {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 15px;
+        padding: 25px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .alerts h3 {
+        color: #ff6b6b;
+        margin-bottom: 20px;
+        font-size: 1.5em;
+        text-align: center;
+      }
+
+      .alert-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+      }
+
+      .alert-table th,
+      .alert-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .alert-table th {
+        background: rgba(255, 107, 107, 0.2);
+        color: #ff6b6b;
+        font-weight: bold;
+      }
+
+      .alert-table tbody tr:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .severity-high {
+        color: #ff4444;
+        font-weight: bold;
+      }
+
+      .severity-medium {
+        color: #ffaa44;
+        font-weight: bold;
+      }
+
+      .severity-low {
+        color: #44ff44;
+      }
+
+      .no-alerts {
+        text-align: center;
+        color: #888;
+        font-style: italic;
+        padding: 30px;
+      }
+
+      .loading {
+        text-align: center;
+        color: #00d4ff;
+        font-size: 1.1em;
+      }
+
+      .error {
+        background: rgba(255, 68, 68, 0.2);
+        border: 1px solid #ff4444;
+        color: #ff4444;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        margin: 20px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>🛡️ Zero-Day Attack Detection IDS</h1>
+      <p>Real-time Network Security Monitoring</p>
+      <div class="status">
+        <div class="status-indicator" id="statusIndicator"></div>
+        <span id="statusText">Connecting...</span>
+      </div>
+    </div>
+
+    <div class="dashboard">
+      <div class="card">
+        <h3>📊 System Statistics</h3>
+        <div class="stat">
+          <span>Total Packets Analyzed:</span>
+          <span class="stat-value" id="totalPackets">0</span>
+        </div>
+        <div class="stat">
+          <span>Threats Detected:</span>
+          <span class="stat-value" id="threatsDetected">0</span>
+        </div>
+        <div class="stat">
+          <span>Detection Rate:</span>
+          <span class="stat-value" id="detectionRate">0%</span>
+        </div>
+        <div class="stat">
+          <span>System Uptime:</span>
+          <span class="stat-value" id="uptime">00:00:00</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🔍 Active Models</h3>
+        <div class="stat">
+          <span>Isolation Forest:</span>
+          <span class="stat-value" id="isolationForest">Active</span>
+        </div>
+        <div class="stat">
+          <span>One-Class SVM:</span>
+          <span class="stat-value" id="oneClassSVM">Active</span>
+        </div>
+        <div class="stat">
+          <span>Autoencoder:</span>
+          <span class="stat-value" id="autoencoder">Active</span>
+        </div>
+        <div class="stat">
+          <span>LSTM Network:</span>
+          <span class="stat-value" id="lstmNetwork">Active</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🌐 Network Activity</h3>
+        <div class="stat">
+          <span>Active Connections:</span>
+          <span class="stat-value" id="activeConnections">0</span>
+        </div>
+        <div class="stat">
+          <span>Suspicious IPs:</span>
+          <span class="stat-value" id="suspiciousIPs">0</span>
+        </div>
+        <div class="stat">
+          <span>Blocked Attempts:</span>
+          <span class="stat-value" id="blockedAttempts">0</span>
+        </div>
+        <div class="stat">
+          <span>Last Alert:</span>
+          <span class="stat-value" id="lastAlert">None</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="alerts">
+      <h3>🚨 Recent Security Alerts</h3>
+      <table class="alert-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Type</th>
+            <th>Source IP</th>
+            <th>Severity</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody id="alertsTableBody">
+          <tr>
+            <td colspan="5" class="loading">
+              Connecting to monitoring system...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <script>
+      class IDSDashboard {
+        constructor() {
+          this.ws = null;
+          this.reconnectInterval = 5000;
+          this.stats = {
+            totalPackets: 0,
+            threatsDetected: 0,
+            activeConnections: 0,
+            suspiciousIPs: new Set(),
+            blockedAttempts: 0,
+          };
+          this.alerts = [];
+          this.startTime = Date.now();
+          this.init();
+        }
+
+        init() {
+          this.connectWebSocket();
+          this.updateUptime();
+          setInterval(() => this.updateUptime(), 1000);
+        }
+
+        connectWebSocket() {
+          try {
+            this.ws = new WebSocket("ws://localhost:8765");
+
+            this.ws.onopen = () => {
+              console.log("Connected to IDS monitoring system");
+              this.updateStatus("connected", "🟢 Connected to IDS");
+              this.clearError();
+            };
+
+            this.ws.onmessage = (event) => {
+              try {
+                const data = JSON.parse(event.data);
+                this.handleMessage(data);
+              } catch (error) {
+                console.error("Error parsing message:", error);
+              }
+            };
+
+            this.ws.onclose = () => {
+              console.log("Disconnected from IDS monitoring system");
+              this.updateStatus("disconnected", "🔴 Disconnected");
+              this.showError("Connection lost. Attempting to reconnect...");
+              setTimeout(() => this.connectWebSocket(), this.reconnectInterval);
+            };
+
+            this.ws.onerror = (error) => {
+              console.error("WebSocket error:", error);
+              this.updateStatus("error", "⚠️ Connection Error");
+              this.showError(
+                "Unable to connect to monitoring system. Make sure the IDS is running."
+              );
+            };
+          } catch (error) {
+            console.error("Failed to create WebSocket:", error);
+            this.updateStatus("error", "⚠️ Connection Failed");
+            this.showError(
+              "Failed to establish connection. Please check if the monitoring system is running."
+            );
+          }
+        }
+
+        handleMessage(data) {
+          switch (data.type) {
+            case "alert":
+              this.addAlert(data);
+              break;
+            case "stats":
+              this.updateStats(data);
+              break;
+            case "system_status":
+              this.updateSystemStatus(data);
+              break;
+            default:
+              console.log("Unknown message type:", data.type);
+          }
+        }
+
+        addAlert(alert) {
+          this.stats.threatsDetected++;
+          this.alerts.unshift({
+            time: new Date(alert.timestamp || Date.now()).toLocaleTimeString(),
+            type: alert.attack_type || "Unknown",
+            sourceIP: alert.source_ip || "Unknown",
+            severity: alert.severity || "medium",
+            description: alert.description || "Anomalous activity detected",
+          });
+
+          // Keep only last 50 alerts
+          if (this.alerts.length > 50) {
+            this.alerts = this.alerts.slice(0, 50);
+          }
+
+          this.updateAlertsTable();
+          this.updateStatistics();
+
+          // Update last alert time
+          document.getElementById("lastAlert").textContent =
+            this.alerts[0].time;
+        }
+
+        updateStats(stats) {
+          if (stats.total_packets !== undefined) {
+            this.stats.totalPackets = stats.total_packets;
+          }
+          if (stats.active_connections !== undefined) {
+            this.stats.activeConnections = stats.active_connections;
+          }
+          if (stats.suspicious_ips !== undefined) {
+            stats.suspicious_ips.forEach((ip) =>
+              this.stats.suspiciousIPs.add(ip)
+            );
+          }
+          this.updateStatistics();
+        }
+
+        updateSystemStatus(status) {
+          // Update model status indicators
+          const models = [
+            "isolationForest",
+            "oneClassSVM",
+            "autoencoder",
+            "lstmNetwork",
+          ];
+          models.forEach((model) => {
+            const element = document.getElementById(model);
+            if (
+              element &&
+              status.models &&
+              status.models[model] !== undefined
+            ) {
+              element.textContent = status.models[model]
+                ? "Active"
+                : "Inactive";
+              element.style.color = status.models[model]
+                ? "#44ff44"
+                : "#ff4444";
+            }
+          });
+        }
+
+        updateStatistics() {
+          document.getElementById("totalPackets").textContent =
+            this.stats.totalPackets.toLocaleString();
+          document.getElementById("threatsDetected").textContent =
+            this.stats.threatsDetected.toLocaleString();
+          document.getElementById("activeConnections").textContent =
+            this.stats.activeConnections.toLocaleString();
+          document.getElementById("suspiciousIPs").textContent =
+            this.stats.suspiciousIPs.size.toLocaleString();
+          document.getElementById("blockedAttempts").textContent =
+            this.stats.blockedAttempts.toLocaleString();
+
+          // Calculate detection rate
+          const detectionRate =
+            this.stats.totalPackets > 0
+              ? (
+                  (this.stats.threatsDetected / this.stats.totalPackets) *
+                  100
+                ).toFixed(2)
+              : 0;
+          document.getElementById(
+            "detectionRate"
+          ).textContent = `${detectionRate}%`;
+        }
+
+        updateAlertsTable() {
+          const tbody = document.getElementById("alertsTableBody");
+
+          if (this.alerts.length === 0) {
+            tbody.innerHTML =
+              '<tr><td colspan="5" class="no-alerts">No security alerts detected</td></tr>';
+            return;
+          }
+
+          tbody.innerHTML = this.alerts
+            .map(
+              (alert) => `
+                    <tr>
+                        <td>${alert.time}</td>
+                        <td>${alert.type}</td>
+                        <td>${alert.sourceIP}</td>
+                        <td class="severity-${
+                          alert.severity
+                        }">${alert.severity.toUpperCase()}</td>
+                        <td>${alert.description}</td>
+                    </tr>
+                `
+            )
+            .join("");
+        }
+
+        updateUptime() {
+          const uptimeMs = Date.now() - this.startTime;
+          const hours = Math.floor(uptimeMs / (1000 * 60 * 60));
+          const minutes = Math.floor(
+            (uptimeMs % (1000 * 60 * 60)) / (1000 * 60)
+          );
+          const seconds = Math.floor((uptimeMs % (1000 * 60)) / 1000);
+
+          document.getElementById("uptime").textContent = `${hours
+            .toString()
+            .padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds
+            .toString()
+            .padStart(2, "0")}`;
+        }
+
+        updateStatus(status, text) {
+          const indicator = document.getElementById("statusIndicator");
+          const statusText = document.getElementById("statusText");
+
+          indicator.className = `status-indicator ${status}`;
+          statusText.textContent = text;
+        }
+
+        showError(message) {
+          let errorDiv = document.querySelector(".error");
+          if (!errorDiv) {
+            errorDiv = document.createElement("div");
+            errorDiv.className = "error";
+            document.querySelector(".header").appendChild(errorDiv);
+          }
+          errorDiv.textContent = message;
+          errorDiv.style.display = "block";
+        }
+
+        clearError() {
+          const errorDiv = document.querySelector(".error");
+          if (errorDiv) {
+            errorDiv.style.display = "none";
+          }
+        }
+      }
+
+      // Initialize dashboard when page loads
+      document.addEventListener("DOMContentLoaded", () => {
+        new IDSDashboard();
+      });
+    </script>
+  </body>
+</html>
